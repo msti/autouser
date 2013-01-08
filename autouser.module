@@ -1,0 +1,144 @@
+<?php
+
+
+/**
+ * Implements hook_menu().
+ */
+function autouser_menu() {
+  $items['autouser/%'] = array(
+    'title' => 'Click here to login',
+    'page callback' => '_autouser',
+    'page arguments' => array(1),
+    'access callback' => TRUE,
+    'type' => MENU_NORMAL_ITEM,
+  );
+  $items['admin/config/people/autouser'] = array(
+    'title' => 'Autouser setup',
+    'page callback' => 'drupal_get_form',
+    'page argument' => 'drupal_get_form',
+    'page arguments' => array('autouser_settings'),
+    'access callback' => TRUE,
+    'type' => MENU_NORMAL_ITEM,
+  );
+  return $items;
+}
+
+
+
+/*
+ * create the admin settings form
+ */
+function autouser_settings(){
+
+//drupal_set_message('asd');
+//$_SESSION['messages']['status'][0]='sadasdasds';
+//dsm($_SESSION);
+
+  // get all roles
+  $roles = array_map('check_plain', user_roles(TRUE));
+  //remove the automatically generated autouser role
+  $autouser_role = user_role_load_by_name('autouser');
+  unset($roles[$autouser_role->rid]);
+  unset($roles[DRUPAL_AUTHENTICATED_RID]);
+
+  $form['autouser_url'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Autouser url'),
+      '#description' => t('The url used to create and login the new users. What you enter here will be prefixed by autouser/'),
+      '#default_value' => variable_get('autouser_url'),
+  );
+  $form['autouser_roles'] = array(
+      '#type' => 'select',
+      '#title' => t('Assign the role'),
+      '#options'  => $roles,
+      '#description' => "Assign this role to the new users. Use with CAUTION",
+      '#default_value' => variable_get('autouser_roles'),
+  );
+  $form['autouser_redirect_url'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Redirect url'),
+      '#description' => t('Redirect the user to this url after login'),
+      '#default_value' => variable_get('autouser_redirect_url'),
+  );
+  $form['#submit'][] = 'autouser_settings_submit';
+/*  $form['autouser']['num_users'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Number of users'),
+      '#description' => t('Create up to so many users using this url.'),
+      '#default_value' => variable_get('num_users'),
+  );*/
+  return system_settings_form($form);
+}
+
+function autouser_settings_submit($form){
+  $url = $form['autouser_url']['#value'];
+  drupal_set_message(t('Send your users to this location: @url',array('@url'=>url($url))));
+}
+
+/**
+ * Implements hook_form_alter().
+ */
+function autouser_form_alter(&$form, &$form_state, $form_id) {
+  /*
+   *if (isset($form['type']) && $form['type']['#value'] . '_node_settings' == $form_id) {
+   *  $form['workflow']['upload_' . $form['type']['#value']] = array(
+   *    '#type' => 'radios',
+   *    '#title' => t('Attachments'),
+   *    '#default_value' => variable_get('upload_' . $form['type']['#value'], 1),
+   *    '#options' => array(t('Disabled'), t('Enabled')),
+   * );
+   *}
+   */
+//dsm($form);
+}
+
+/**
+ * creates a user and logs him in
+ *
+ * @return void
+ **/
+function _autouser($arg1){
+
+  // check that this user has been defined in the settings page
+  if($arg1 == variable_get('autouser_url')){
+    $autouser_role = user_role_load_by_name('autouser');
+    $roles = array(
+      DRUPAL_AUTHENTICATED_RID => 'authenticated user',
+      $autouser_role->rid => TRUE,
+      variable_get('roles') => TRUE,
+    );
+
+    $new_user = new stdClass();
+
+    $new_user->name = _username(8);
+    $new_user->pass = user_password(8);
+    $new_user->mail = 'localhost@localdomain';
+    $new_user->roles = $roles;
+    $new_user->status = 1; // omit this line to block this user at creation
+    $new_user->is_new = TRUE;
+
+    $new_user = user_save($new_user);
+
+    $form_state['uid'] = $new_user->uid;
+    // log in the user
+    user_login_submit(array(), $form_state);
+    // redirect to user page
+    drupal_goto(variable_get('redirect_url'));
+  } else {
+    drupal_goto('<front>');
+  }
+}
+
+
+/**
+ * generates a string
+ *
+ * @param $length
+ *     The length of the output string
+ * @return
+ *     A random string
+ **/
+function _username($length) {
+  $chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  return substr(str_shuffle($chars),0,$length);
+}

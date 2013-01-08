@@ -1,0 +1,3 @@
+name = Auto user login
+description = Auto create a user, assign a preset role and login via a user defined link
+core = 7.x

@@ -1,0 +1,38 @@
+<?php
+
+
+/**
+ * Implements hook_install().
+ */
+function autouser_install() {
+  //create the default role
+  $role = new stdClass();
+  $role->name = 'autouser';
+  user_role_save($role);
+}
+
+
+/**
+ * Implements hook_uninstall().
+ */
+function autouser_uninstall() {
+
+  $autouser_role = user_role_load_by_name('autouser');
+
+  // get all users with certain our roleid and delete them
+  $result = db_select('users_roles', 'ur')
+  ->fields('ur', array('uid'))
+  ->condition('rid', $autouser_role->rid)
+  ->execute();
+  foreach($result as $record) {
+    $uids[] = $record->uid;
+  }
+  if(isset($uids)) user_delete_multiple($uids);
+
+  // delete the user role
+  user_role_delete('autouser');
+
+  variable_del('autouser_url');
+  variable_del('autouser_roles');
+  variable_del('autouser_redirect_url');
+}
